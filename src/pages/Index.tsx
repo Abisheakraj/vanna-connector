@@ -6,10 +6,12 @@ import Hero from '@/components/Hero';
 import Footer from '@/components/Footer';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Database, MessageSquare, BarChart3 } from 'lucide-react';
+import { Database, MessageSquare, BarChart3, LogIn } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // Check if user has a saved database connection
   const hasDatabaseConnection = () => {
@@ -17,9 +19,11 @@ const Index = () => {
     return !!connection;
   };
   
-  // Navigate based on connection status
+  // Navigate based on connection and auth status
   const handleGetStarted = () => {
-    if (hasDatabaseConnection()) {
+    if (!user) {
+      navigate('/login');
+    } else if (hasDatabaseConnection()) {
       navigate('/database/explore');
     } else {
       navigate('/database');
@@ -84,7 +88,12 @@ const Index = () => {
                 className="bg-vanna hover:bg-vanna-dark text-white py-6 px-8 text-lg rounded-lg"
                 onClick={handleGetStarted}
               >
-                {hasDatabaseConnection() ? (
+                {!user ? (
+                  <>
+                    <LogIn className="mr-2 h-5 w-5" />
+                    Sign In to Get Started
+                  </>
+                ) : hasDatabaseConnection() ? (
                   <>
                     <Database className="mr-2 h-5 w-5" />
                     Continue to Explorer
@@ -110,23 +119,45 @@ const Index = () => {
                 Connect your database and start exploring your data with natural language queries
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button
-                  className="bg-vanna hover:bg-vanna-dark"
-                  size="lg"
-                  onClick={() => navigate('/database')}
-                >
-                  <Database className="mr-2 h-5 w-5" />
-                  Connect Database
-                </Button>
-                {hasDatabaseConnection() && (
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => navigate('/database/explore')}
-                  >
-                    <MessageSquare className="mr-2 h-5 w-5" />
-                    Explore Data
-                  </Button>
+                {!user ? (
+                  <>
+                    <Button
+                      className="bg-vanna hover:bg-vanna-dark"
+                      size="lg"
+                      onClick={() => navigate('/login')}
+                    >
+                      <LogIn className="mr-2 h-5 w-5" />
+                      Sign In
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => navigate('/signup')}
+                    >
+                      Create Account
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      className="bg-vanna hover:bg-vanna-dark"
+                      size="lg"
+                      onClick={() => navigate('/database')}
+                    >
+                      <Database className="mr-2 h-5 w-5" />
+                      Connect Database
+                    </Button>
+                    {hasDatabaseConnection() && (
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={() => navigate('/database/explore')}
+                      >
+                        <MessageSquare className="mr-2 h-5 w-5" />
+                        Explore Data
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

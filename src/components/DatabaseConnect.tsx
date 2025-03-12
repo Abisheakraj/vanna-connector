@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Database, 
   ServerCog, 
@@ -26,46 +26,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { toast } from '@/components/ui/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useQuery, useMutation } from '@tanstack/react-query';
-
-interface ConnectionConfig {
-  type: string;
-  host: string;
-  port: string;
-  username: string;
-  password: string;
-  database: string;
-}
-
-// This function would normally call your backend API
-const testDatabaseConnection = async (config: ConnectionConfig): Promise<boolean> => {
-  // Simulate an API call with some basic validation
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  if (!config.host || !config.username || !config.database) {
-    throw new Error("Missing required fields");
-  }
-  
-  // For demo purposes, we'll check some common errors
-  if (config.host === 'localhost' && config.port === '1234') {
-    throw new Error("Connection refused: invalid port");
-  }
-  
-  return true;
-};
-
-// This function would connect to the database and return tables
-const connectToDatabase = async (config: ConnectionConfig): Promise<void> => {
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  if (!config.host || !config.username || !config.database) {
-    throw new Error("Missing required fields");
-  }
-  
-  return;
-};
+import { useAuth } from '@/contexts/AuthContext';
+import { 
+  ConnectionConfig, 
+  testDatabaseConnection, 
+  saveConnectionConfig 
+} from '@/services/database';
 
 const DatabaseConnect: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [connectionConfig, setConnectionConfig] = useState<ConnectionConfig>({
     type: 'postgresql',
     host: '',
@@ -76,6 +46,26 @@ const DatabaseConnect: React.FC = () => {
   });
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Try to load existing connection from localStorage
+    const savedConnection = localStorage.getItem('databaseConnection');
+    if (savedConnection) {
+      try {
+        const config = JSON.parse(savedConnection);
+        setConnectionConfig({
+          type: config.type || 'postgresql',
+          host: config.host || '',
+          port: config.port || '',
+          username: config.username || '',
+          password: config.password || '',
+          database: config.database || ''
+        });
+      } catch (e) {
+        console.error('Error parsing saved connection:', e);
+      }
+    }
+  }, []);
 
   const handleConfigChange = (field: keyof ConnectionConfig, value: string) => {
     setConnectionConfig(prev => ({
@@ -139,15 +129,8 @@ const DatabaseConnect: React.FC = () => {
   
   // Connect to database mutation
   const connectDatabaseMutation = useMutation({
-    mutationFn: connectToDatabase,
+    mutationFn: (config: ConnectionConfig) => saveConnectionConfig(config),
     onSuccess: () => {
-      // Store connection details
-      localStorage.setItem('databaseConnection', JSON.stringify({
-        ...connectionConfig,
-        isConnected: true,
-        timestamp: new Date().toISOString()
-      }));
-      
       // Navigate to explorer
       navigate('/database/explore');
       
@@ -184,9 +167,30 @@ const DatabaseConnect: React.FC = () => {
   
   const isLoading = testConnectionMutation.isPending || connectDatabaseMutation.isPending;
 
+  // Use a demo/example database option
+  const useDemoDatabase = () => {
+    const demoConfig = {
+      type: 'postgresql',
+      host: 'demo.vannaai.example',
+      port: '5432',
+      username: 'demo_user',
+      password: 'demo_password',
+      database: 'vanna_demo'
+    };
+    
+    setConnectionConfig(demoConfig);
+    setConnectionStatus('success');
+    setConnectionError(null);
+    
+    toast({
+      title: "Using demo database",
+      description: "You can now explore with our pre-configured demo database",
+    });
+  };
+
   return (
     <div className="max-w-3xl mx-auto">
-      <Card className="glass-card">
+      <Card className="glass-card mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Database className="h-5 w-5 text-vanna" />
@@ -355,7 +359,18 @@ const DatabaseConnect: React.FC = () => {
         </CardFooter>
       </Card>
 
-      <div className="mt-8 text-center text-sm text-muted-foreground">
+      <div className="text-center">
+        <p className="mb-4 text-muted-foreground">Don't have a database to connect?</p>
+        <Button 
+          variant="secondary" 
+          onClick={useDemoDatabase}
+          className="mb-4"
+        >
+          Use Demo Database
+        </Button>
+      </div>
+
+      <div className="mt-4 text-center text-sm text-muted-foreground">
         <p>Need help? Check our <a href="#" className="text-vanna hover:underline">documentation</a> or <a href="#" className="text-vanna hover:underline">contact support</a>.</p>
       </div>
     </div>

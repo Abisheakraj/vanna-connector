@@ -4,8 +4,11 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import DatabaseConnect from '@/components/DatabaseConnect';
 import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DatabaseConnectPage = () => {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -16,6 +19,11 @@ const DatabaseConnectPage = () => {
             <p className="text-muted-foreground text-lg">
               Start exploring your data with natural language queries
             </p>
+            {user && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Logged in as: {user.email}
+              </p>
+            )}
           </div>
           
           <DatabaseConnect />
