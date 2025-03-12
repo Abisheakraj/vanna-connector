@@ -8,7 +8,8 @@ import {
   Globe, 
   CheckCircle, 
   XCircle, 
-  Loader2 
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -21,8 +22,10 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useQuery, useMutation } from '@tanstack/react-query';
 
 interface ConnectionConfig {
   type: string;
@@ -32,6 +35,34 @@ interface ConnectionConfig {
   password: string;
   database: string;
 }
+
+// This function would normally call your backend API
+const testDatabaseConnection = async (config: ConnectionConfig): Promise<boolean> => {
+  // Simulate an API call with some basic validation
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  if (!config.host || !config.username || !config.database) {
+    throw new Error("Missing required fields");
+  }
+  
+  // For demo purposes, we'll check some common errors
+  if (config.host === 'localhost' && config.port === '1234') {
+    throw new Error("Connection refused: invalid port");
+  }
+  
+  return true;
+};
+
+// This function would connect to the database and return tables
+const connectToDatabase = async (config: ConnectionConfig): Promise<void> => {
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  if (!config.host || !config.username || !config.database) {
+    throw new Error("Missing required fields");
+  }
+  
+  return;
+};
 
 const DatabaseConnect: React.FC = () => {
   const navigate = useNavigate();
@@ -43,8 +74,8 @@ const DatabaseConnect: React.FC = () => {
     password: '',
     database: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const handleConfigChange = (field: keyof ConnectionConfig, value: string) => {
     setConnectionConfig(prev => ({
@@ -55,6 +86,7 @@ const DatabaseConnect: React.FC = () => {
     // Reset connection status when config changes
     if (connectionStatus !== 'idle') {
       setConnectionStatus('idle');
+      setConnectionError(null);
     }
   };
 
@@ -68,6 +100,8 @@ const DatabaseConnect: React.FC = () => {
         return '1433';
       case 'sqlite':
         return '';
+      case 'oracle':
+        return '1521';
       default:
         return '';
     }
@@ -80,42 +114,62 @@ const DatabaseConnect: React.FC = () => {
       port: getDefaultPort(type)
     }));
   };
-
-  const testConnection = async () => {
-    setIsLoading(true);
-    
-    // Simulate connection test
-    try {
-      // In a real application, you would make an API call to test the connection here
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      if (connectionConfig.host && connectionConfig.username && connectionConfig.database) {
-        setConnectionStatus('success');
-        toast({
-          title: "Connection successful",
-          description: `Successfully connected to ${connectionConfig.database} on ${connectionConfig.host}`,
-        });
-      } else {
-        setConnectionStatus('error');
-        toast({
-          title: "Connection failed",
-          description: "Please fill in all required fields",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
+  
+  // Testing connection mutation
+  const testConnectionMutation = useMutation({
+    mutationFn: testDatabaseConnection,
+    onSuccess: () => {
+      setConnectionStatus('success');
+      setConnectionError(null);
+      toast({
+        title: "Connection successful",
+        description: `Successfully connected to ${connectionConfig.database} on ${connectionConfig.host}`,
+      });
+    },
+    onError: (error: Error) => {
       setConnectionStatus('error');
+      setConnectionError(error.message);
       toast({
         title: "Connection failed",
-        description: "Could not connect to the database. Please check your credentials.",
+        description: error.message || "Could not connect to the database",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
+  });
+  
+  // Connect to database mutation
+  const connectDatabaseMutation = useMutation({
+    mutationFn: connectToDatabase,
+    onSuccess: () => {
+      // Store connection details
+      localStorage.setItem('databaseConnection', JSON.stringify({
+        ...connectionConfig,
+        isConnected: true,
+        timestamp: new Date().toISOString()
+      }));
+      
+      // Navigate to explorer
+      navigate('/database/explore');
+      
+      toast({
+        title: "Database connected",
+        description: `You're now connected to ${connectionConfig.database}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Connection failed",
+        description: error.message || "Could not connect to the database",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const testConnection = () => {
+    testConnectionMutation.mutate(connectionConfig);
   };
 
-  const connectToDatabase = () => {
+  const handleConnectToDatabase = () => {
     if (connectionStatus !== 'success') {
       toast({
         title: "Test connection first",
@@ -125,171 +179,184 @@ const DatabaseConnect: React.FC = () => {
       return;
     }
 
-    // Store connection details (in a real app, you might use a context or state management)
-    localStorage.setItem('databaseConnection', JSON.stringify(connectionConfig));
-    
-    // Navigate to database explorer
-    navigate('/database/explore');
+    connectDatabaseMutation.mutate(connectionConfig);
   };
+  
+  const isLoading = testConnectionMutation.isPending || connectDatabaseMutation.isPending;
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-10">
-      <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl font-bold mb-3">Connect Your Database</h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">
-            Set up your database connection to start exploring and querying your data with natural language.
-          </p>
-        </div>
-
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5 text-vanna" />
-              Database Connection
-            </CardTitle>
-            <CardDescription>
-              Enter your database credentials to establish a connection
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="database-type">Database Type</Label>
-                  <Select 
-                    value={connectionConfig.type}
-                    onValueChange={(value) => handleDatabaseTypeChange(value)}
-                  >
-                    <SelectTrigger id="database-type" className="w-full">
-                      <SelectValue placeholder="Select database type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="postgresql">PostgreSQL</SelectItem>
-                      <SelectItem value="mysql">MySQL</SelectItem>
-                      <SelectItem value="mssql">SQL Server</SelectItem>
-                      <SelectItem value="sqlite">SQLite</SelectItem>
-                      <SelectItem value="oracle">Oracle</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {connectionConfig.type !== 'sqlite' && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="host">Host</Label>
-                        <div className="relative">
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                            <Globe className="h-4 w-4" />
-                          </div>
-                          <Input
-                            id="host"
-                            placeholder="localhost or IP address"
-                            className="pl-10"
-                            value={connectionConfig.host}
-                            onChange={(e) => handleConfigChange('host', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <Label htmlFor="port">Port</Label>
-                        <Input
-                          id="port"
-                          placeholder="Port"
-                          value={connectionConfig.port}
-                          onChange={(e) => handleConfigChange('port', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="username">Username</Label>
-                        <Input
-                          id="username"
-                          placeholder="Database username"
-                          value={connectionConfig.username}
-                          onChange={(e) => handleConfigChange('username', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="password">Password</Label>
-                        <div className="relative">
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                            <Lock className="h-4 w-4" />
-                          </div>
-                          <Input
-                            id="password"
-                            type="password"
-                            placeholder="••••••••"
-                            className="pl-10"
-                            value={connectionConfig.password}
-                            onChange={(e) => handleConfigChange('password', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-                
-                <div>
-                  <Label htmlFor="database">Database Name</Label>
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      <ServerCog className="h-4 w-4" />
-                    </div>
-                    <Input
-                      id="database"
-                      placeholder="Database name"
-                      className="pl-10"
-                      value={connectionConfig.database}
-                      onChange={(e) => handleConfigChange('database', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Button 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={testConnection}
+    <div className="max-w-3xl mx-auto">
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-vanna" />
+            Database Connection
+          </CardTitle>
+          <CardDescription>
+            Enter your database credentials to establish a connection
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {connectionError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Connection Error</AlertTitle>
+                <AlertDescription>
+                  {connectionError}
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="database-type">Database Type</Label>
+                <Select 
+                  value={connectionConfig.type}
+                  onValueChange={(value) => handleDatabaseTypeChange(value)}
                   disabled={isLoading}
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Testing...
-                    </>
-                  ) : (
-                    <>
-                      Test Connection
-                      {connectionStatus === 'success' && (
-                        <CheckCircle className="ml-2 h-4 w-4 text-green-500" />
-                      )}
-                      {connectionStatus === 'error' && (
-                        <XCircle className="ml-2 h-4 w-4 text-destructive" />
-                      )}
-                    </>
-                  )}
-                </Button>
-                <Button 
-                  className="flex-1 bg-vanna hover:bg-vanna-dark"
-                  onClick={connectToDatabase}
-                  disabled={connectionStatus !== 'success' || isLoading}
-                >
-                  Connect & Explore
-                  <Table className="ml-2 h-4 w-4" />
-                </Button>
+                  <SelectTrigger id="database-type" className="w-full">
+                    <SelectValue placeholder="Select database type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="postgresql">PostgreSQL</SelectItem>
+                    <SelectItem value="mysql">MySQL</SelectItem>
+                    <SelectItem value="mssql">SQL Server</SelectItem>
+                    <SelectItem value="sqlite">SQLite</SelectItem>
+                    <SelectItem value="oracle">Oracle</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {connectionConfig.type !== 'sqlite' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="host">Host</Label>
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          <Globe className="h-4 w-4" />
+                        </div>
+                        <Input
+                          id="host"
+                          placeholder="localhost or IP address"
+                          className="pl-10"
+                          value={connectionConfig.host}
+                          onChange={(e) => handleConfigChange('host', e.target.value)}
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="port">Port</Label>
+                      <Input
+                        id="port"
+                        placeholder="Port"
+                        value={connectionConfig.port}
+                        onChange={(e) => handleConfigChange('port', e.target.value)}
+                        disabled={isLoading}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="username">Username</Label>
+                      <Input
+                        id="username"
+                        placeholder="Database username"
+                        value={connectionConfig.username}
+                        onChange={(e) => handleConfigChange('username', e.target.value)}
+                        disabled={isLoading}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="password">Password</Label>
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          <Lock className="h-4 w-4" />
+                        </div>
+                        <Input
+                          id="password"
+                          type="password"
+                          placeholder="••••••••"
+                          className="pl-10"
+                          value={connectionConfig.password}
+                          onChange={(e) => handleConfigChange('password', e.target.value)}
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+              
+              <div>
+                <Label htmlFor="database">Database Name</Label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <ServerCog className="h-4 w-4" />
+                  </div>
+                  <Input
+                    id="database"
+                    placeholder="Database name"
+                    className="pl-10"
+                    value={connectionConfig.database}
+                    onChange={(e) => handleConfigChange('database', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+        <CardFooter className="flex flex-col sm:flex-row gap-4">
+          <Button 
+            variant="outline" 
+            className="flex-1"
+            onClick={testConnection}
+            disabled={isLoading}
+          >
+            {testConnectionMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Testing...
+              </>
+            ) : (
+              <>
+                Test Connection
+                {connectionStatus === 'success' && (
+                  <CheckCircle className="ml-2 h-4 w-4 text-green-500" />
+                )}
+                {connectionStatus === 'error' && (
+                  <XCircle className="ml-2 h-4 w-4 text-destructive" />
+                )}
+              </>
+            )}
+          </Button>
+          <Button 
+            className="flex-1 bg-vanna hover:bg-vanna-dark"
+            onClick={handleConnectToDatabase}
+            disabled={connectionStatus !== 'success' || isLoading}
+          >
+            {connectDatabaseMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              <>
+                Connect & Explore
+                <Table className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
 
-        <div className="mt-8 text-center text-sm text-muted-foreground">
-          <p>Need help? Check our <a href="#" className="text-vanna hover:underline">documentation</a> or <a href="#" className="text-vanna hover:underline">contact support</a>.</p>
-        </div>
+      <div className="mt-8 text-center text-sm text-muted-foreground">
+        <p>Need help? Check our <a href="#" className="text-vanna hover:underline">documentation</a> or <a href="#" className="text-vanna hover:underline">contact support</a>.</p>
       </div>
     </div>
   );

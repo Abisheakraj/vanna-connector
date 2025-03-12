@@ -1,12 +1,31 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import Footer from '@/components/Footer';
-import DatabaseConnect from '@/components/DatabaseConnect';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Database, MessageSquare, BarChart3 } from 'lucide-react';
 
 const Index = () => {
+  const navigate = useNavigate();
+  
+  // Check if user has a saved database connection
+  const hasDatabaseConnection = () => {
+    const connection = localStorage.getItem('databaseConnection');
+    return !!connection;
+  };
+  
+  // Navigate based on connection status
+  const handleGetStarted = () => {
+    if (hasDatabaseConnection()) {
+      navigate('/database/explore');
+    } else {
+      navigate('/database');
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -59,21 +78,58 @@ const Index = () => {
                 </div>
               ))}
             </div>
+            
+            <div className="mt-12 text-center">
+              <Button 
+                className="bg-vanna hover:bg-vanna-dark text-white py-6 px-8 text-lg rounded-lg"
+                onClick={handleGetStarted}
+              >
+                {hasDatabaseConnection() ? (
+                  <>
+                    <Database className="mr-2 h-5 w-5" />
+                    Continue to Explorer
+                  </>
+                ) : (
+                  <>
+                    <Database className="mr-2 h-5 w-5" />
+                    Connect Your Database
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </section>
         
         <Separator />
         
-        <section id="connect" className="py-20">
+        <section id="get-started" className="py-20 bg-muted/20">
           <div className="container mx-auto px-4 md:px-6">
             <div className="text-center max-w-3xl mx-auto mb-12">
-              <h2 className="text-3xl font-bold mb-4">Connect Your Database</h2>
-              <p className="text-muted-foreground text-lg">
-                Start exploring your data with natural language queries
+              <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
+              <p className="text-muted-foreground text-lg mb-8">
+                Connect your database and start exploring your data with natural language queries
               </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button
+                  className="bg-vanna hover:bg-vanna-dark"
+                  size="lg"
+                  onClick={() => navigate('/database')}
+                >
+                  <Database className="mr-2 h-5 w-5" />
+                  Connect Database
+                </Button>
+                {hasDatabaseConnection() && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => navigate('/database/explore')}
+                  >
+                    <MessageSquare className="mr-2 h-5 w-5" />
+                    Explore Data
+                  </Button>
+                )}
+              </div>
             </div>
-            
-            <DatabaseConnect />
           </div>
         </section>
       </main>
@@ -85,17 +141,17 @@ const Index = () => {
 // Features data
 const features = [
   {
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-vanna"><ellipse cx="12" cy="6" rx="8" ry="3"></ellipse><path d="M4 6v6a8 3 0 0 0 16 0V6"></path><path d="M4 12v6a8 3 0 0 0 16 0v-6"></path></svg>,
+    icon: <Database className="h-6 w-6 text-vanna" />,
     title: "Multiple Database Support",
     description: "Connect to PostgreSQL, MySQL, SQL Server, SQLite, and more with ease.",
   },
   {
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-vanna"><path d="M17.5 22h.5c.5 0 1-.2 1.4-.6.4-.4.6-.9.6-1.4V7.5L14.5 2H6c-.5 0-1 .2-1.4.6C4.2 3 4 3.5 4 4v3"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M4 12v-2a2 2 0 0 1 2-2h2"></path><path d="M20 12v2a2 2 0 0 1-2 2h-2"></path><path d="M4 18c0-1.5.44-2 1.5-2.5S7.34 14 8 14s2.5.5 3.5 1 2 2 2 2"></path><path d="M10 20c-1.5 0-3 .5-3 2"></path><path d="M14 20c1.5 0 3 .5 3 2"></path><line x1="12" y1="15" x2="12" y2="20"></line></svg>,
+    icon: <MessageSquare className="h-6 w-6 text-vanna" />,
     title: "Natural Language Queries",
     description: "Ask questions about your data in plain English and get instant answers.",
   },
   {
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-vanna"><path d="M3 3v18h18"></path><path d="M18.4 7.2 18.7 7h.3"></path><path d="m8 11 2.45-2.45"></path><path d="m16 9-3.03 3.03"></path><path d="m6 15 2.45-2.45"></path><path d="m14 13-1.05 1.05"></path><path d="m10 16.5 1.7-1.7"></path><rect x="13" y="4" width="7" height="3" rx="1.5"></rect><circle cx="16.5" cy="15.5" r="2"></circle><path d="M16.5 10v3.5"></path></svg>,
+    icon: <BarChart3 className="h-6 w-6 text-vanna" />,
     title: "Interactive Visualizations",
     description: "Automatically generate charts and graphs from your query results.",
   },
